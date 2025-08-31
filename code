@@ -1,0 +1,82 @@
+import pandas as pd
+import string
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.model_selection import train_test_split
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+import nltk
+from nltk.corpus import stopwords
+
+# -------------------------
+# 1. Load Dataset
+# -------------------------
+df = pd.read_csv("spam.csv", encoding="latin-1")[["v1", "v2"]]
+df.columns = ["label", "message"]
+
+print("Dataset Shape:", df.shape)
+print(df.head())
+
+# -------------------------
+# 2. Preprocess Text
+# -------------------------
+nltk.download("stopwords")
+stop_words = set(stopwords.words("english"))
+
+def preprocess_text(text):
+    text = text.lower()  # lowercase
+    text = "".join([ch for ch in text if ch not in string.punctuation])  # remove punctuation
+    words = [word for word in text.split() if word not in stop_words]  # remove stopwords
+    return " ".join(words)
+
+df["clean_message"] = df["message"].apply(preprocess_text)
+
+# -------------------------
+# 3. Feature Extraction (TF-IDF)
+# -------------------------
+vectorizer = TfidfVectorizer()
+X = vectorizer.fit_transform(df["clean_message"])
+y = df["label"]
+
+# -------------------------
+# 4. Train-Test Split
+# -------------------------
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# -------------------------
+# 5. Train Model
+# -------------------------
+model = MultinomialNB()
+model.fit(X_train, y_train)
+
+# -------------------------
+# 6. Evaluation
+# -------------------------
+y_pred = model.predict(X_test)
+
+print("Accuracy:", accuracy_score(y_test, y_pred))
+print("\nClassification Report:\n", classification_report(y_test, y_pred))
+
+# Confusion Matrix
+plt.figure(figsize=(5,4))
+sns.heatmap(confusion_matrix(y_test, y_pred), annot=True, fmt="d", cmap="Blues",
+            xticklabels=["Ham", "Spam"], yticklabels=["Ham", "Spam"])
+plt.title("Confusion Matrix")
+plt.show()
+
+# -------------------------
+# 7. Test with New Example
+# -------------------------
+sample_msgs = [
+    "Congratulations! You won a free ticket. Call now!",
+    "Hey, are we still meeting for lunch tomorrow?",
+    "URGENT! Your account has been compromised. Verify immediately!"
+]
+
+sample_clean = [preprocess_text(msg) for msg in sample_msgs]
+sample_features = vectorizer.transform(sample_clean)
+predictions = model.predict(sample_features)
+
+for msg, pred in zip(sample_msgs, predictions):
+    print(f"Message: {msg} --> Prediction: {pred}")
